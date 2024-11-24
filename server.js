@@ -14,7 +14,6 @@ mongoose.connect(process.env.MONGO_URI, {
 }).then(() => console.log('Connected to MongoDB Atlas'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-
 const bookSchema = new mongoose.Schema({
   name: String,
   price: Number,
@@ -30,13 +29,13 @@ app.get('/books', async (req, res) => {
   res.json(books);
 });
 
-// Add or update a book
+// Add or update a book (Increase quantity if book exists)
 app.post('/books', async (req, res) => {
   const { name, price, quantity } = req.body;
 
   let book = await Book.findOne({ name });
   if (book) {
-    book.quantity += quantity; // Update quantity if the book exists
+    book.quantity += quantity; // Increase quantity if the book exists
     await book.save();
   } else {
     book = new Book({ name, price, quantity });
@@ -45,7 +44,7 @@ app.post('/books', async (req, res) => {
   res.json(book);
 });
 
-// Sell a book
+// Sell a book (Decrease quantity if enough stock is available)
 app.post('/books/sell', async (req, res) => {
   const { name, quantity } = req.body;
 
@@ -54,7 +53,7 @@ app.post('/books/sell', async (req, res) => {
     return res.status(400).json({ error: 'Not enough stock or book unavailable' });
   }
 
-  book.quantity -= quantity;
+  book.quantity -= quantity; // Decrease quantity when a book is sold
   await book.save();
   res.json(book);
 });
