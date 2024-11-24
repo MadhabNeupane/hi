@@ -1,66 +1,64 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config(); // Load environment variables
+const bodyParser = require('body-parser');
 
 const app = express();
-
-// Middleware
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
 
-// Connect to MongoDB Atlas
+// MongoDB connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 }).then(() => console.log('Connected to MongoDB Atlas'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Book Schema
-const BookSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  price: { type: Number, required: true }, // Added price field
-  quantity: { type: Number, required: true }, // Added quantity field
+
+const bookSchema = new mongoose.Schema({
+  name: String,
+  price: Number,
+  quantity: Number,
 });
 
-const Book = mongoose.model('Book', BookSchema);
+const Book = mongoose.model('Book', bookSchema);
 
-// Routes
+// API Routes
+// Get all available books
 app.get('/books', async (req, res) => {
-  try {
-    const books = await Book.find();
-    res.json(books);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  const books = await Book.find();
+  res.json(books);
 });
 
+// Add or update a book
 app.post('/books', async (req, res) => {
-  try {
-    const { name, price, quantity } = req.body;
+  const { name, price, quantity } = req.body;
 
-    // Validate inputs
-    if (!name || price == null || quantity == null) {
-      return res.status(400).json({ error: 'Name, price, and quantity are required.' });
-    }
-
-    const book = new Book({ name, price, quantity });
+  let book = await Book.findOne({ name });
+  if (book) {
+    book.quantity += quantity; // Update quantity if the book exists
     await book.save();
-    res.status(201).json(book);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+  } else {
+    book = new Book({ name, price, quantity });
+    await book.save();
   }
+  res.json(book);
 });
 
-app.delete('/books/:id', async (req, res) => {
-  try {
-    await Book.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Book deleted' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// Sell a book
+app.post('/books/sell', async (req, res) => {
+  const { name, quantity } = req.body;
+
+  const book = await Book.findOne({ name });
+  if (!book || book.quantity < quantity) {
+    return res.status(400).json({ error: 'Not enough stock or book unavailable' });
   }
+
+  book.quantity -= quantity;
+  await book.save();
+  res.json(book);
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+// Start the server
+const PORT = 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
